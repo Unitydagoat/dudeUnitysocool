@@ -1,4 +1,6 @@
-const WEBHOOK_URL = "https://discord.com/api/webhooks/1554231951261438002/UPKhy2f3a9tuzKxCZvhGDtR2SBhhx6jlQiSBRzykMAyI8e0ajjKdV4lGV3QtcJourdvB";
+const axios = require("axios");
+
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
 
 function buildEmbed(data) {
   return {
@@ -72,7 +74,8 @@ export default async function handler(req, res) {
     timestamp: new Date().toISOString(),
   });
 
-  await sendWebhook(buildEmbed({ OculusId, errorCode, ErrorMessage, Platform, PackageName, DeviceModel }));
+  await axios.post(WEBHOOK_URL, buildEmbed({ OculusId, errorCode, ErrorMessage, Platform, PackageName, DeviceModel }), { timeout: 10000 });
+  //await sendWebhook(buildEmbed({ OculusId, errorCode, ErrorMessage, Platform, PackageName, DeviceModel }));
 
   return res.status(200).json({ received: true });
 }
