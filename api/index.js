@@ -2,7 +2,7 @@ const webhookdude = "https://discord.com/api/webhooks/1554231951261438002/UPKhy2
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "no get requests boi, use POST" });
+    return res.status(405).json({ error: "omg dada uunity so hotttt" });
   }
 
   const { OculusId, errorCode, ErrorMessage, Platform, PackageName, DeviceModel } = req.body;
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         { name: "Device Model", value: DeviceModel || "N/A", inline: true },
       ],
       timestamp: new Date().toISOString(),
-      footer: { text: "GUBBA TAG Auth" }
+      footer: { text: "omg unity.xd is so rapable" }
     }]
   };
 
