@@ -1,6 +1,6 @@
 export default function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "dude omg unity is so sexy and hot right guys" });
   }
 
   const { OculusId, errorCode, ErrorMessage, Platform, PackageName, DeviceModel } = req.body;
