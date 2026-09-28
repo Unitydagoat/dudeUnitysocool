@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const WEBHOOK_URL = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
+const webhookUrl = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
 
 function buildEmbed(data) {
   return {
@@ -48,9 +48,8 @@ function buildEmbed(data) {
 }
 
 async function sendWebhook(payload) {
-  try {
-    const response = await axios.post(
-      WEBHOOK_URL,
+  await axios.post(
+      webhookUrl,
       payload,
       {
         timeout: 10000,
@@ -59,26 +58,6 @@ async function sendWebhook(payload) {
         }
       }
     );
-
-    console.log("[WEBHOOK] Sent successfully:", response.status);
-
-    return {
-      success: true,
-      status: response.status
-    };
-  } catch (error) {
-    console.error(
-      "[WEBHOOK ERROR]",
-      error.response?.status,
-      error.response?.data || error.message
-    );
-
-    return {
-      success: false,
-      status: error.response?.status || 500,
-      error: error.response?.data || error.message
-    };
-  }
 }
 
 module.exports = async function handler(req, res) {
@@ -170,16 +149,6 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
       error: "Use POST"
-    });
-  }
-
-  if (!WEBHOOK_URL) {
-    console.error("[WEBHOOK] WEBHOOK_URL is not configured");
-
-    return res.status(500).json({
-      received: false,
-      webhookSent: false,
-      error: "WEBHOOK_URL is not configured"
     });
   }
 
