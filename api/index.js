@@ -1,184 +1,202 @@
-const axios = require("axios");
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
 
-const webhookUrl = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
+const TITLE_ID = "1F3B21";
+const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "";
+const PHOTON_APP_ID = "d367d3f3-d294-4eef-8b35-3d0722fab130";
 
-function buildEmbed(data) {
+async function playFabPost(path, body = {}) {
+  const url = `https://${TITLE_ID}.playfabapi.com/Admin/${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-SecretKey": SECRET_KEY,
+    },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
+async function checkPlayFabBan(playFabId) {
+  try {
+    const data = await playFabPost("GetUserBans", { PlayFabId: playFabId });
+    if (data.data?.BanData?.length > 0) {
+      return { check: "playfab_ban", passed: false, detail: `Active bans: ${data.data.BanData.length}` };
+    }
+    return { check: "playfab_ban", passed: true };
+  } catch (e) {
+    return { check: "playfab_ban", passed: false, detail: e.message };
+  }
+}
+
+async function checkPhotonToken(playFabId) {
+  try {
+    const data = await playFabPost("GetPhotonAuthenticationToken", { PhotonApplicationId: PHOTON_APP_ID });
+    if (!data.data?.PhotonCustomAuthenticationToken) {
+      return { check: "photon_token", passed: false, detail: "No token returned" };
+    }
+    return { check: "photon_token", passed: true };
+  } catch (e) {
+    return { check: "photon_token", passed: false, detail: e.message };
+  }
+}
+
+async function checkTitleData() {
+  try {
+    const data = await playFabPost("GetTitleData", {});
+    if (!data.data?.Data || Object.keys(data.data.Data).length === 0) {
+      return { check: "title_data", passed: false, detail: "Title data empty" };
+    }
+    return { check: "title_data", passed: true };
+  } catch (e) {
+    return { check: "title_data", passed: false, detail: e.message };
+  }
+}
+
+async function checkPlayerStats(playFabId) {
+  try {
+    const data = await playFabPost("GetPlayerStatistics", { PlayFabId: playFabId });
+    if (!data.data?.Statistics) {
+      return { check: "player_stats", passed: false, detail: "No stats found" };
+    }
+    return { check: "player_stats", passed: true };
+  } catch (e) {
+    return { check: "player_stats", passed: false, detail: e.message };
+  }
+}
+
+async function checkInventory(playFabId) {
+  try {
+    const data = await playFabPost("GetUserInventory", { PlayFabId: playFabId });
+    if (!data.data) {
+      return { check: "inventory", passed: false, detail: "No inventory data" };
+    }
+    return { check: "inventory", passed: true };
+  } catch (e) {
+    return { check: "inventory", passed: false, detail: e.message };
+  }
+}
+
+async function checkUserData(playFabId) {
+  try {
+    const data = await playFabPost("GetUserData", { PlayFabId: playFabId });
+    if (!data.data?.Data) {
+      return { check: "user_data", passed: false, detail: "No user data" };
+    }
+    return { check: "user_data", passed: true };
+  } catch (e) {
+    return { check: "user_data", passed: false, detail: e.message };
+  }
+}
+
+async function checkCloudScript() {
+  try {
+    const data = await playFabPost("GetCloudScriptVersions", {});
+    if (!data.data?.Versions || data.data.Versions.length === 0) {
+      return { check: "cloudscript", passed: false, detail: "No versions found" };
+    }
+    return { check: "cloudscript", passed: true };
+  } catch (e) {
+    return { check: "cloudscript", passed: false, detail: e.message };
+  }
+}
+
+function buildEmbed(failures, info) {
+  const fields = [
+    { name: "PlayFab ID", value: info.PlayFabId || "N/A", inline: true },
+    { name: "Title ID", value: TITLE_ID, inline: true },
+    { name: "Platform", value: info.Platform || "N/A", inline: true },
+    { name: "Package Name", value: info.PackageName || "N/A", inline: true },
+    { name: "Device Model", value: info.DeviceModel || "N/A", inline: true },
+    { name: "Timestamp", value: new Date().toISOString(), inline: false },
+  ];
+
+  for (const f of failures) {
+    fields.push({ name: f.check, value: f.detail, inline: false });
+  }
+
   return {
     embeds: [{
       title: "Entitlement Check Failed",
       color: 0xFF0000,
-      fields: [
-        {
-          name: "Oculus ID",
-          value: String(data.OculusId || "N/A"),
-          inline: true
-        },
-        {
-          name: "Error Code",
-          value: String(data.errorCode ?? "N/A"),
-          inline: true
-        },
-        {
-          name: "Error Message",
-          value: String(data.ErrorMessage || "N/A").slice(0, 1024),
-          inline: false
-        },
-        {
-          name: "Platform",
-          value: String(data.Platform || "N/A"),
-          inline: true
-        },
-        {
-          name: "Package Name",
-          value: String(data.PackageName || "N/A"),
-          inline: true
-        },
-        {
-          name: "Device Model",
-          value: String(data.DeviceModel || "N/A"),
-          inline: true
-        }
-      ],
+      fields,
       timestamp: new Date().toISOString(),
-      footer: {
-        text: "unity so hot"
-      }
+      footer: { text: "unity so hot" }
     }]
   };
 }
 
 async function sendWebhook(payload) {
-  await axios.post(
-      webhookUrl,
-      payload,
-      {
-        timeout: 10000,
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
+  try {
+    await fetch(WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error("[shucks dude]", e.message);
+  }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method === "GET") {
     const html = `<!DOCTYPE html>
 <html>
-<head>
-  <title>Dude why is unity so hot and sexy ima peg him</title>
-</head>
-
-<body style="
-  background:#1a1a2e;
-  color:#fff;
-  font-family:sans-serif;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  height:100vh;
-  margin:0
-">
-
+<head><title>Entitlement Check API</title></head>
+<body style="background:#1a1a2e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0">
   <h1>Entitlement Check API</h1>
-
-  <p>Tester for embed dw abt this >.<.</p>
-
-  <button
-    onclick="sendTest()"
-    style="
-      padding:12px 24px;
-      font-size:16px;
-      background:#E74C3C;
-      color:#fff;
-      border:none;
-      border-radius:8px;
-      cursor:pointer
-    "
-  >
-    Send Test Webhook
+  <p>Send POST with PlayFabId to run all checks.</p>
+  <button onclick="sendTest()" style="padding:12px 24px;font-size:16px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer">
+    Run Test Check
   </button>
-
   <p id="status"></p>
-
   <script>
     async function sendTest() {
-      const status = document.getElementById("status");
-
-      status.textContent = "Sending...";
-
-      try {
-        const response = await fetch("/api", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            OculusId: "8884568945928532",
-            errorCode: -403,
-            ErrorMessage: "entitlement failure",
-            Platform: "Quest",
-            PackageName: "com.com.gubbatag",
-            DeviceModel: "Meta Quest"
-          })
-        });
-
-        const data = await response.json();
-
-        if (response.ok && data.webhookSent) {
-          status.textContent = "Webhook sent!";
-        } else {
-          status.textContent =
-            "Webhook failed: " + (data.error || "Unknown error");
-
-          console.error(data);
-        }
-      } catch (error) {
-        status.textContent = "Request failed: " + error.message;
-        console.error(error);
-      }
+      document.getElementById('status').textContent = 'Running checks...';
+      const res = await fetch('/api', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          PlayFabId: "test123",
+          Platform: "Quest",
+          PackageName: "com.gubbatag",
+          DeviceModel: "Meta Quest 3"
+        })
+      });
+      const data = await res.json();
+      document.getElementById('status').textContent = data.failures?.length + ' failures found';
     }
   </script>
-
 </body>
 </html>`;
-
     return res.status(200).send(html);
   }
 
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Use POST"
-    });
+    return res.status(405).json({ error: "Use POST" });
   }
 
-  const {
-    OculusId,
-    errorCode,
-    ErrorMessage,
-    Platform,
-    PackageName,
-    DeviceModel
-  } = req.body || {};
+  const { PlayFabId, Platform, PackageName, DeviceModel } = req.body || {};
 
-  console.log("[ENTITLEMENT FAIL]", {
-    OculusId,
-    errorCode,
-    ErrorMessage,
-    Platform,
-    PackageName,
-    DeviceModel,
-    timestamp: new Date().toISOString()
-  });
+  if (!PlayFabId) {
+    return res.status(400).json({ error: "PlayFabId required" });
+  }
 
-  const payload = buildEmbed({
-    OculusId,
-    errorCode,
-    ErrorMessage,
-    Platform,
-    PackageName,
-    DeviceModel
-  });
+  const results = await Promise.all([
+    checkPlayFabBan(PlayFabId),
+    checkPhotonToken(PlayFabId),
+    checkTitleData(),
+    checkPlayerStats(PlayFabId),
+    checkInventory(PlayFabId),
+    checkUserData(PlayFabId),
+    checkCloudScript(),
+  ]);
 
-  await sendWebhook(payload);
-};
+  const failures = results.filter(r => !r.passed);
+
+  if (failures.length > 0) {
+    await sendWebhook(buildEmbed(failures, req.body));
+  }
+
+  return res.status(200).json({ received: true, failures: failures.length, results });
+}
