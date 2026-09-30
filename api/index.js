@@ -65,7 +65,7 @@ module.exports = async function handler(req, res) {
     const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Entitlement API</title>
+  <title>Dude why is unity so hot and sexy ima peg him</title>
 </head>
 
 <body style="
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
 
   <h1>Entitlement Check API</h1>
 
-  <p>Send POST requests to this endpoint with entitlement failure data.</p>
+  <p>Tester for embed dw abt this >.<.</p>
 
   <button
     onclick="sendTest()"
