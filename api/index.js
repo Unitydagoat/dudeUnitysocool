@@ -114,11 +114,11 @@ module.exports = async function handler(req, res) {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            OculusId: "TEST_OCULUS_ID",
-            errorCode: 1234,
-            ErrorMessage: "Test entitlement failure",
+            OculusId: "8884568945928532",
+            errorCode: -403,
+            ErrorMessage: "entitlement failure",
             Platform: "Quest",
-            PackageName: "com.example.test",
+            PackageName: "com.com.gubbatag",
             DeviceModel: "Meta Quest"
           })
         });
