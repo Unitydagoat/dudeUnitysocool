@@ -157,7 +157,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          PlayFabId: "test123",
+          PlayFabId: "A33437C916F6B6F7",
           Platform: "Quest",
           PackageName: "com.gubbatag",
           DeviceModel: "Meta Quest 3"
