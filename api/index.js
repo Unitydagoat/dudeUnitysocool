@@ -1,7 +1,7 @@
 const WEBHOOK_URL = "https://discord.com/api/webhooks/1554238728275239003/DqrZU9IKLfYU1W5inSDKSsLanw1UWUDriSP2C9D5UBj1MVLj5wxH7ZZ0tFobL1vbs2Ti";
 
-const TITLE_ID = "1F3B21";
-const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "";
+const TITLE_ID = "116C19";
+const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "FN87SC9HGNFQD93THWQ9YARI7DF4CFPU6XUKJ51JHI4GSSGBEO";
 const PHOTON_APP_ID = "d367d3f3-d294-4eef-8b35-3d0722fab130";
 
 async function playFabPost(path, body = {}) {
