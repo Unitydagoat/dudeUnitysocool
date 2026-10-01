@@ -142,9 +142,9 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const html = `<!DOCTYPE html>
 <html>
-<head><title>Entitlement Check API</title></head>
+<head><title>Unitys so hot and saxy</title></head>
 <body style="background:#1a1a2e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0">
-  <h1>Entitlement Check API</h1>
+  <h1>api shi</h1>
   <p>Send POST with PlayFabId to run all checks.</p>
   <button onclick="sendTest()" style="padding:12px 24px;font-size:16px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer">
     Run Test Check
