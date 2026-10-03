@@ -104,6 +104,26 @@ function buildEmbed(failures, info) {
   };
 }
 
+function buildSuccessEmbed(info) {
+  return {
+    embeds: [{
+      title: "Auth Successful",
+      color: 0x00FF00,
+      fields: [
+        { name: "PlayFab ID", value: info.PlayFabId || "N/A", inline: true },
+        { name: "Title ID", value: TITLE_ID, inline: true },
+        { name: "Platform", value: info.Platform || "N/A", inline: true },
+        { name: "Package Name", value: info.PackageName || "N/A", inline: true },
+        { name: "Device Model", value: info.DeviceModel || "N/A", inline: true },
+        { name: "Photon Token", value: info.photonToken ? `\`\`\`${info.photonToken}\`\`\`` : "N/A", inline: false },
+        { name: "Timestamp", value: new Date().toISOString(), inline: false },
+      ],
+      timestamp: new Date().toISOString(),
+      footer: { text: "unity so hot" }
+    }]
+  };
+}
+
 async function sendWebhook(payload) {
   try {
     await fetch(WEBHOOK_URL, {
@@ -138,7 +158,8 @@ export default async function handler(req, res) {
           PlayFabId: "A33437C916F6B6F7",
           Platform: "Quest",
           PackageName: "com.gubbatag",
-          DeviceModel: "Meta Quest 3"
+          DeviceModel: "Meta Quest 3",
+          photonToken: "example_token_123"
         })
       });
       const data = await res.json();
@@ -154,7 +175,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
-  const { PlayFabId, Platform, PackageName, DeviceModel } = req.body || {};
+  const { PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage } = req.body || {};
 
   if (!PlayFabId) {
     return res.status(400).json({ error: "PlayFabId required" });
@@ -172,6 +193,8 @@ export default async function handler(req, res) {
 
   if (failures.length > 0) {
     await sendWebhook(buildEmbed(failures, req.body));
+  } else {
+    await sendWebhook(buildSuccessEmbed({ PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage }));
   }
 
   return res.status(200).json({ received: true, failures: failures.length, results });
