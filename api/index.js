@@ -5,7 +5,6 @@ const WEBHOOK_URL = "https://discord.com/api/webhooks/1555046191677313067/EhIfWE
 const TITLE_ID = "116C19";
 const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "FN87SC9HGNFQD93THWQ9YARI7DF4CFPU6XUKJ51JHI4GSSGBEO";
 const PHOTON_APP_ID = "d367d3f3-d294-4eef-8b35-3d0722fab130";
-const PHOTON_APP_SECRET = process.env.PHOTON_APP_SECRET || "HKXBPIAUAAZ9NBC3JYFUCGF6OFJE9Z85GPF7HYMBRAXHNSOMT9";
 
 async function playFabPost(path, body = {}) {
   const url = `https://${TITLE_ID}.playfabapi.com/Admin/${path}`;
@@ -19,83 +18,7 @@ async function playFabPost(path, body = {}) {
   });
   return res.json();
 }
-function decodeBase64Url(str) {
-  try {
-    const padded = str.replace(/-/g, "+").replace(/_/g, "/");
-    return Buffer.from(padded, "base64").toString("utf8");
-  } catch {
-    return null;
-  }
-}
 
-function verifyPhotonToken(token) {
-  if (!token || typeof token !== "string") {
-    return { valid: false, detail: "Missing or malformed token" };
-  }
-
-  const parts = token.split(".");
-  let payload = null;
-  let signed = false;
-
-  if (parts.length === 3) {
-    payload = decodeBase64Url(parts[1]);
-    if (PHOTON_APP_SECRET) {
-      const expected = crypto
-        .createHmac("sha256", PHOTON_APP_SECRET)
-        .update(`${parts[0]}.${parts[1]}`)
-        .digest("base64url");
-      if (expected === parts[2]) signed = true;
-      else return { valid: false, detail: "Signature mismatch" };
-    }
-  } else {
-    payload = decodeBase64Url(token);
-  }
-
-  if (!payload) {
-    return { valid: false, detail: "Token is not valid base64" };
-  }
-
-  let data;
-  try {
-    data = JSON.parse(payload);
-  } catch {
-    return { valid: false, detail: "Token payload is not valid JSON" };
-  }
-
-  const exp = data.exp ?? data.expiration ?? data.expires ?? data.ExpirationTime;
-  if (exp !== undefined && exp !== null) {
-    const expMs = exp > 1e12 ? exp : exp * 1000;
-    if (Date.now() > expMs) {
-      return { valid: false, detail: "Token expired" };
-    }
-  }
-
-  const userId = data.userId ?? data.UserId ?? data.playfabId ?? data.PlayFabId ?? null;
-
-  return {
-    valid: true,
-    userId,
-    expiresAt: exp ? new Date(exp > 1e12 ? exp : exp * 1000).toISOString() : null,
-  };
-}
-
-async function checkPhotonAuth(playFabId, token) {
-  try {
-    if (!token) {
-      return { check: "photon_verify", passed: false, detail: "No token provided in request body" };
-    }
-    const result = verifyPhotonToken(token);
-    if (!result.valid) {
-      return { check: "photon_verify", passed: false, detail: result.detail };
-    }
-    if (playFabId && result.userId && result.userId !== playFabId) {
-      return { check: "photon_verify", passed: false, detail: "Token userId does not match PlayFabId" };
-    }
-    return { check: "photon_verify", passed: true, detail: `Token valid${result.expiresAt ? `, expires ${result.expiresAt}` : ""}` };
-  } catch (e) {
-    return { check: "photon_verify", passed: false, detail: e.message };
-  }
-}
 async function checkPlayFabBan(playFabId) {
   try {
     const data = await playFabPost("GetUserBans", { PlayFabId: playFabId });
@@ -108,18 +31,6 @@ async function checkPlayFabBan(playFabId) {
   }
 }
 
-async function checkPhotonToken(playFabId) {
-  try {
-    const data = await playFabPost("GetPhotonAuthenticationToken", { PhotonApplicationId: PHOTON_APP_ID });
-    if (!data.data?.PhotonCustomAuthenticationToken) {
-      return { check: "photon_token", passed: false, detail: "No token returned" };
-    }
-    return { check: "photon_token", passed: true };
-  } catch (e) {
-    return { check: "photon_token", passed: false, detail: e.message };
-  }
-}
-
 async function checkTitleData() {
   try {
     const data = await playFabPost("GetTitleData", {});
@@ -129,18 +40,6 @@ async function checkTitleData() {
     return { check: "title_data", passed: true };
   } catch (e) {
     return { check: "title_data", passed: false, detail: e.message };
-  }
-}
-
-async function checkPlayerStats(playFabId) {
-  try {
-    const data = await playFabPost("GetPlayerStatistics", { PlayFabId: playFabId });
-    if (!data.data?.Statistics) {
-      return { check: "player_stats", passed: false, detail: "No stats found" };
-    }
-    return { check: "player_stats", passed: true };
-  } catch (e) {
-    return { check: "player_stats", passed: false, detail: e.message };
   }
 }
 
@@ -224,7 +123,7 @@ export default async function handler(req, res) {
 <head><title>Unitys so hot and saxy</title></head>
 <body style="background:#1a1a2e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0">
   <h1>api shi</h1>
-  <p>Send POST with PlayFabId (and optional token) to run all checks.</p>
+  <p>Send POST with PlayFabId to run all checks.</p>
   <button onclick="sendTest()" style="padding:12px 24px;font-size:16px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer">
     Run Test Check
   </button>
@@ -255,27 +154,19 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
-  const { PlayFabId, Platform, PackageName, DeviceModel, token } = req.body || {};
+  const { PlayFabId, Platform, PackageName, DeviceModel } = req.body || {};
 
   if (!PlayFabId) {
     return res.status(400).json({ error: "PlayFabId required" });
   }
 
-  const checks = [
+  const results = await Promise.all([
     checkPlayFabBan(PlayFabId),
-    checkPhotonToken(PlayFabId),
     checkTitleData(),
-    checkPlayerStats(PlayFabId),
     checkInventory(PlayFabId),
     checkUserData(PlayFabId),
     checkCloudScript(),
-  ];
-
-  if (token) {
-    checks.push(checkPhotonAuth(PlayFabId, token));
-  }
-
-  const results = await Promise.all(checks);
+  ]);
 
   const failures = results.filter(r => !r.passed);
 
