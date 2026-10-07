@@ -107,16 +107,21 @@ function buildEmbed(failures, info) {
 function buildSuccessEmbed(info) {
   return {
     embeds: [{
-      title: "Auth Successful",
+      title: "Playfab Auth Success",
       color: 0x00FF00,
       fields: [
-        { name: "PlayFab ID", value: info.PlayFabId || "N/A", inline: true },
-        { name: "Title ID", value: TITLE_ID, inline: true },
-        { name: "Platform", value: info.Platform || "N/A", inline: true },
-        { name: "Package Name", value: info.PackageName || "N/A", inline: true },
-        { name: "Device Model", value: info.DeviceModel || "N/A", inline: true },
-        { name: "Photon Token", value: info.photonToken ? `\`\`\`${info.photonToken}\`\`\`` : "N/A", inline: false },
-        { name: "Timestamp", value: new Date().toISOString(), inline: false },
+        { name: "[CUSTOM ID]:", value: info.customId || "N/A" },
+        { name: "[PLAYFAB ID]:", value: info.PlayFabId || "N/A" },
+        { name: "[NONCE]:", value: info.nonce || "N/A" },
+        { name: "[DEVICE IDENTIFIER]:", value: info.deviceIdentifier || "N/A" },
+        { name: "[GAME VERSION]:", value: info.gameVersion || "N/A" },
+        { name: "Meta Info", value: `[USER ID]: ${info.metaUserId || "N/A"}\n[USERNAME]: ${info.metaUsername || "N/A"}\n[ORG SCOPED ID]: ${info.metaOrgScopedId || "N/A"}` },
+        { name: "Ip", value: info.ip || "N/A" },
+        { name: "Photon Token", value: info.photonToken ? `\`\`\`${info.photonToken}\`\`\`` : "N/A" },
+        { name: "Platform", value: info.Platform || "N/A" },
+        { name: "Package Name", value: info.PackageName || "N/A" },
+        { name: "Device Model", value: info.DeviceModel || "N/A" },
+        { name: "Timestamp", value: new Date().toISOString() },
       ],
       timestamp: new Date().toISOString(),
       footer: { text: "unity so hot" }
@@ -159,7 +164,14 @@ export default async function handler(req, res) {
           Platform: "Quest",
           PackageName: "com.gubbatag",
           DeviceModel: "Meta Quest 3",
-          photonToken: "example_token_123"
+          photonToken: "example_token_123",
+          customId: "ProjectDark_2c22b500c04f1074_2803575791272924",
+          nonce: "mWiYM1Febv197suJSKTG4JQtxo0Kv0ZLkqoKaoejulMABOxEDeyZQ18o",
+          deviceIdentifier: "2c22b500c04f1074",
+          gameVersion: "ProjectDarkV3",
+          metaUserId: "2803575791272924",
+          metaUsername: "error",
+          metaOrgScopedId: "error"
         })
       });
       const data = await res.json();
@@ -175,11 +187,29 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Use POST" });
   }
 
-  const { PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage } = req.body || {};
+  const {
+    PlayFabId,
+    Platform,
+    PackageName,
+    DeviceModel,
+    photonToken,
+    OculusId,
+    errorCode,
+    ErrorMessage,
+    customId,
+    nonce,
+    deviceIdentifier,
+    gameVersion,
+    metaUserId,
+    metaUsername,
+    metaOrgScopedId,
+  } = req.body || {};
 
   if (!PlayFabId) {
     return res.status(400).json({ error: "PlayFabId required" });
   }
+
+  const ip = (req.headers["x-forwarded-for"]?.split(",")[0] || req.connection?.remoteAddress || "N/A").trim();
 
   const results = await Promise.all([
     checkPlayFabBan(PlayFabId),
@@ -192,9 +222,9 @@ export default async function handler(req, res) {
   const failures = results.filter(r => !r.passed);
 
   if (failures.length > 0) {
-    await sendWebhook(buildEmbed(failures, req.body));
+    await sendWebhook(buildEmbed(failures, { ...req.body, customId, nonce, deviceIdentifier, gameVersion, metaUserId, metaUsername, metaOrgScopedId, ip }));
   } else {
-    await sendWebhook(buildSuccessEmbed({ PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage }));
+    await sendWebhook(buildSuccessEmbed({ PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage, customId, nonce, deviceIdentifier, gameVersion, metaUserId, metaUsername, metaOrgScopedId, ip }));
   }
 
   return res.status(200).json({ received: true, failures: failures.length, results });
