@@ -107,7 +107,7 @@ function buildEmbed(failures, info) {
 function buildSuccessEmbed(info) {
   return {
     embeds: [{
-      title: "Playfab Auth Success",
+      title: "Playfab Auth Success yipi",
       color: 0x00FF00,
       fields: [
         { name: "[CUSTOM ID]:", value: info.customId || "N/A" },
@@ -164,8 +164,8 @@ export default async function handler(req, res) {
           Platform: "Quest",
           PackageName: "com.gubbatag",
           DeviceModel: "Meta Quest 3",
-          photonToken: "example_token_123",
-          customId: "ProjectDark_2c22b500c04f1074_2803575791272924",
+          photonToken: "789f7dg89dfg7df89g6778fdg6789d",
+          customId: "SMALLKITTYPLAYER0EhsT405LOLjMgUD4kEJAcE5LVk1YHKi6o",
           nonce: "mWiYM1Febv197suJSKTG4JQtxo0Kv0ZLkqoKaoejulMABOxEDeyZQ18o",
           deviceIdentifier: "2c22b500c04f1074",
           gameVersion: "ProjectDarkV3",
