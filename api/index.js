@@ -1,10 +1,10 @@
 import crypto from "crypto";
 
-const WEBHOOK_URL = "https://discord.com/api/webhooks/1555046191677313067/EhIfWEzXdH1UiWi2Sk1mB6fX5yci7xUYXTXvcj48Q7tXGlSR7jSxF_Uan28h_SJeoza-";
+const WEBHOOK_URL = "https://discord.com/api/webhooks/1561451386653122701/HH7oNRue9t2e22o0aYfySDE24TomkVXUfqQ0q6uDXhe6EtD11to8l9MXST3VlDRIJkIy";
 
-const TITLE_ID = "116C19";
-const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "FN87SC9HGNFQD93THWQ9YARI7DF4CFPU6XUKJ51JHI4GSSGBEO";
-const PHOTON_APP_ID = "d367d3f3-d294-4eef-8b35-3d0722fab130";
+const TITLE_ID = "1A8FBB";
+const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "3R89SCP5R1ZHHAJHFMQXKSAXYA8UBYN5ZGWC8GGAOZFIXUC6JK";
+const PHOTON_APP_ID = "58470cc4-2d65-42d3-b822-44a73939fdd1";
 
 async function playFabPost(path, body = {}) {
   const url = `https://${TITLE_ID}.playfabapi.com/Admin/${path}`;
