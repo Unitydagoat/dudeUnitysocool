@@ -1,10 +1,16 @@
 import crypto from "crypto";
 
 const WEBHOOK_URL = "https://discord.com/api/webhooks/1561451386653122701/HH7oNRue9t2e22o0aYfySDE24TomkVXUfqQ0q6uDXhe6EtD11to8l9MXST3VlDRIJkIy";
-
 const TITLE_ID = "1A8FBB";
 const SECRET_KEY = process.env.PLAYFAB_SECRET_KEY || "3R89SCP5R1ZHHAJHFMQXKSAXYA8UBYN5ZGWC8GGAOZFIXUC6JK";
 const PHOTON_APP_ID = "58470cc4-2d65-42d3-b822-44a73939fdd1";
+const PHOTON_APP_SECRET = process.env.PHOTON_APP_SECRET || "SPADSOWONHGSB48NZGG4ZAR4YRNPMGFWZ4DQMYPDX3XPUU3HHK"; 
+const TOKEN_EXPIRY_SECONDS = 3600;
+const VALID_PLATFORM = "Quest";
+
+const RATE_LIMIT_STORE = {};
+const RATE_LIMIT_WINDOW = 60000;
+const RATE_LIMIT_MAX_REQ = 15;
 
 async function playFabPost(path, body = {}) {
   const url = `https://${TITLE_ID}.playfabapi.com/Admin/${path}`;
@@ -79,7 +85,25 @@ async function checkCloudScript() {
   }
 }
 
-function buildEmbed(failures, info) {
+function generatePhotonToken(userId, appId, platform, appVersion) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    user_id: String(userId),
+    app_id: String(appId),
+    app_version: String(appVersion),
+    platform: String(platform),
+    auth_time: now,
+    expiry: now + TOKEN_EXPIRY_SECONDS,
+  };
+  
+  const payloadJson = JSON.stringify(payload);
+  const signature = crypto.createHmac('sha256', PHOTON_APP_SECRET).update(payloadJson).digest('hex');
+  const encodedPayload = Buffer.from(payloadJson).toString('base64');
+  
+  return `${encodedPayload}.${signature}`;
+}
+
+function buildFailureEmbed(failures, info) {
   const fields = [
     { name: "PlayFab ID", value: info.PlayFabId || "N/A", inline: true },
     { name: "Title ID", value: TITLE_ID, inline: true },
@@ -95,7 +119,7 @@ function buildEmbed(failures, info) {
 
   return {
     embeds: [{
-      title: "Entitlement Check Failed",
+      title: "Entitlement Check Failed - Photon Denied",
       color: 0xFF0000,
       fields,
       timestamp: new Date().toISOString(),
@@ -107,7 +131,7 @@ function buildEmbed(failures, info) {
 function buildSuccessEmbed(info) {
   return {
     embeds: [{
-      title: "Playfab Auth Success yipi",
+      title: "Playfab Auth Success - Photon Token Issued",
       color: 0x00FF00,
       fields: [
         { name: "[CUSTOM ID]:", value: info.customId || "N/A" },
@@ -141,46 +165,32 @@ async function sendWebhook(payload) {
   }
 }
 
+function rateLimit(req, res) {
+  const ip = (req.headers["x-forwarded-for"]?.split(",")[0] || req.connection?.remoteAddress || "unknown").trim();
+  const now = Date.now();
+  
+  if (!RATE_LIMIT_STORE[ip]) {
+    RATE_LIMIT_STORE[ip] = [];
+  }
+  
+  RATE_LIMIT_STORE[ip] = RATE_LIMIT_STORE[ip].filter(t => now - t < RATE_LIMIT_WINDOW);
+  
+  if (RATE_LIMIT_STORE[ip].length >= RATE_LIMIT_MAX_REQ) {
+    return { limited: true, ip };
+  }
+  
+  RATE_LIMIT_STORE[ip].push(now);
+  return { limited: false, ip };
+}
+
 export default async function handler(req, res) {
+  const { limited, ip } = rateLimit(req, res);
+  
+  if (limited) {
+    return res.status(429).json({ result: "error", error: "rate_limited" });
+  }
+
   if (req.method === "GET") {
-    const html = `<!DOCTYPE html>
-<html>
-<head><title>Unitys so hot and saxy</title></head>
-<body style="background:#1a1a2e;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0">
-  <h1>api shi</h1>
-  <p>Send POST with PlayFabId to run all checks.</p>
-  <button onclick="sendTest()" style="padding:12px 24px;font-size:16px;background:#E74C3C;color:#fff;border:none;border-radius:8px;cursor:pointer">
-    Run Test Check
-  </button>
-  <p id="status"></p>
-  <script>
-    async function sendTest() {
-      document.getElementById('status').textContent = 'Running checks...';
-      const res = await fetch('/api', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          PlayFabId: "A33437C916F6B6F7",
-          Platform: "Quest",
-          PackageName: "com.gubbatag",
-          DeviceModel: "Meta Quest 3",
-          photonToken: "789f7dg89dfg7df89g6778fdg6789d",
-          customId: "SMALLKITTYPLAYER0EhsT405LOLjMgUD4kEJAcE5LVk1YHKi6o",
-          nonce: "mWiYM1Febv197suJSKTG4JQtxo0Kv0ZLkqoKaoejulMABOxEDeyZQ18o",
-          deviceIdentifier: "2c22b500c04f1074",
-          gameVersion: "ProjectDarkV3",
-          metaUserId: "2803575791272924",
-          metaUsername: "error",
-          metaOrgScopedId: "error"
-        })
-      });
-      const data = await res.json();
-      document.getElementById('status').textContent = data.failures?.length + ' failures found';
-    }
-  </script>
-</body>
-</html>`;
-    return res.status(200).send(html);
   }
 
   if (req.method !== "POST") {
@@ -188,14 +198,13 @@ export default async function handler(req, res) {
   }
 
   const {
+    AppId,
     PlayFabId,
     Platform,
     PackageName,
     DeviceModel,
-    photonToken,
-    OculusId,
-    errorCode,
-    ErrorMessage,
+    AppVersion,
+    UserId,
     customId,
     nonce,
     deviceIdentifier,
@@ -203,13 +212,22 @@ export default async function handler(req, res) {
     metaUserId,
     metaUsername,
     metaOrgScopedId,
+    photonToken 
   } = req.body || {};
-
-  if (!PlayFabId) {
-    return res.status(400).json({ error: "PlayFabId required" });
+  if (!AppId) {
+    return res.status(400).json({ result: "error", error: "missing_app_id" });
   }
 
-  const ip = (req.headers["x-forwarded-for"]?.split(",")[0] || req.connection?.remoteAddress || "N/A").trim();
+  if (AppId !== PHOTON_APP_ID) {
+    return res.status(401).json({ result: "error", error: "invalid_auth" });
+  }
+
+  if (Platform !== VALID_PLATFORM) {
+    return res.status(400).json({ result: "error", error: "unsupported_platform" });
+  }
+  if (!PlayFabId) {
+    return res.status(400).json({ result: "error", error: "missing_playfab_id" });
+  }
 
   const results = await Promise.all([
     checkPlayFabBan(PlayFabId),
@@ -222,10 +240,43 @@ export default async function handler(req, res) {
   const failures = results.filter(r => !r.passed);
 
   if (failures.length > 0) {
-    await sendWebhook(buildEmbed(failures, { ...req.body, customId, nonce, deviceIdentifier, gameVersion, metaUserId, metaUsername, metaOrgScopedId, ip }));
-  } else {
-    await sendWebhook(buildSuccessEmbed({ PlayFabId, Platform, PackageName, DeviceModel, photonToken, OculusId, errorCode, ErrorMessage, customId, nonce, deviceIdentifier, gameVersion, metaUserId, metaUsername, metaOrgScopedId, ip }));
+    await sendWebhook(buildFailureEmbed(failures, { ...req.body, ip }));
+    return res.status(403).json({ 
+      result: "error", 
+      error: "entitlement_check_failed", 
+      failures: failures.length 
+    });
   }
+  const finalUserId = UserId || PlayFabId || `quest_anon_${Math.floor(Date.now() / 1000)}_${ip}`;
+  let finalPhotonToken = photonToken;
 
-  return res.status(200).json({ received: true, failures: failures.length, results });
+  if (!finalPhotonToken) {
+    try {
+      finalPhotonToken = generatePhotonToken(finalUserId, AppId, Platform, AppVersion || "1.0");
+    } catch (e) {
+      return res.status(500).json({ result: "error", error: "token_generation_failed" });
+    }
+  }
+  await sendWebhook(buildSuccessEmbed({ 
+    ...req.body, 
+    PlayFabId, 
+    Platform, 
+    PackageName, 
+    DeviceModel, 
+    photonToken: finalPhotonToken, 
+    customId, 
+    nonce, 
+    deviceIdentifier, 
+    gameVersion, 
+    metaUserId, 
+    metaUsername, 
+    metaOrgScopedId, 
+    ip 
+  }));
+  return res.status(200).json({ 
+    result: "ok", 
+    token: finalPhotonToken, 
+    user_id: finalUserId, 
+    expires_at: Math.floor(Date.now() / 1000) + TOKEN_EXPIRY_SECONDS 
+  });
 }
